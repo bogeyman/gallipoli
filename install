@@ -1,0 +1,43 @@
+#!/bin/sh
+if [ ! -e python/gallipoli.py ]; then
+	echo "Bitte im gallipoli Verzeichnis ausfuehren"
+	exit 1
+fi
+
+# dependencies
+# 
+dpkg --status python-rrdtool 2> /dev/null > /dev/null; 
+if [ $? -ne 0 ]; then 
+	apt-get install -y python-rrdtool
+fi
+# backup old version
+if [ -e /usr/local/bin/gamma.py ]; then
+	service gamma stop
+	update-rc.d gamma remove
+	rm -f /etc/init.d/gamma
+	mv /usr/local/bin/gamma.py /usr/local/bin/gamma.py.old
+	mv /usr/local/bin/daemon.py /usr/local/bin/daemon.py.old
+	mv /usr/local/bin/gammageneratemunin.py /usr/local/bin/gammageneratemunin.py.old
+	chmod -x /usr/local/bin/gamma.py.old /usr/local/bin/daemon.py /usr/local/bin/gammageneratemunin.py.old
+fi
+
+# Daemon install
+cp python/daemon.py /usr/local/bin/
+cp python/gallipoli.py /usr/local/bin/
+chmod +x /usr/local/bin/gallipoli.py
+
+# start servie at boot time
+rm -f /etc/init.d/gallipoli
+ln -s /usr/local/bin/gallipoli.py /etc/init.d/gallipoli
+update-rc.d gallipoli defaults
+
+# Service
+service gallipoli restart
+
+# Munin scripts
+# test with "munin-run gallipoli-temperature"
+rm /usr/local/share/munin/plugins/gallipoli*
+cp munin/gallipoli* /usr/local/share/munin/plugins/
+rm /etc/munin/plugins/gallipoli*
+( cd /etc/munin/plugins/ && ln -s /usr/local/share/munin/plugins/gallipoli* .)
+service munin-node restart

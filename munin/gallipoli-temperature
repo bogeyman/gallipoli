@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+
+. $MUNIN_LIBDIR/plugins/plugin.sh
+
+if [ "$1" = "autoconf" ]; then
+	echo yes
+	exit 0
+fi
+
+if [ "$1" = "config" ]; then
+
+	echo 'graph_title temperature'
+	echo "graph_args --base 1000"
+	echo 'graph_vlabel %'
+	echo 'graph_scale no'
+	echo 'graph_category heizung'
+	echo 'temperature1.label p02 aussen'
+	echo 'temperature2.label p17 kessel soll'
+	echo 'temperature3.label p32 kessel ist'
+	echo 'temperature4.label p33'
+	echo 'temperaturep7.label p07'
+	echo 'temperaturep8.label p08'
+	echo 'temperaturep12.label p12'
+	echo 'temperaturep13.label p13'
+	echo 'temperaturep17.label p17'
+	echo 'temperaturep18.label p18'
+	echo 'temperaturep20.label p20'
+	echo 'temperaturep21.label p21'
+	echo 'temperaturep23.label p23'
+	echo 'temperaturep24.label p24'
+	echo 'temperaturep27.label p27'
+	echo 'temperaturep31.label p31'
+	echo 'temperaturep32.label p32'
+
+	exit 0
+fi
+curl -s http://localhost:64334/munin-temperature

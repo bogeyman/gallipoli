@@ -1,0 +1,11 @@
+Source: gallipoli
+Maintainer: Tim Gregory <tim.gregory@valar.de>
+Section: misc
+Priority: optional
+Standards-Version: 1.0.0
+Build-Depends: debhelper (>= 9)
+
+Package: gallipoli
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Logging and Munin daemon for Gamma Heater and compatible
