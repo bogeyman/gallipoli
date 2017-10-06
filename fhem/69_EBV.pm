@@ -68,6 +68,7 @@ package main;
 
 use strict;                          #
 use warnings;                        #
+use Digest::CRC;
 
 sub EBV_Read($);                  #
 sub EBV_Ready($);                 #
@@ -127,6 +128,18 @@ sub
 	RemoveInternalTimer($hash); 
 	return undef;               
 }    
+
+#########################################################################
+
+sub
+crc16Kermit($) {
+  my ($raw)= pack("H*" ,@_);
+  my $ctx= Digest::CRC->new(width=>16, init=>0x0000, xorout=>0x0000,
+                          refout=>1, poly=>0x1021, refin=>1, cont=>1);
+  $ctx->add($raw);
+  my $crc = $ctx->hexdigest;
+  return uc(substr($crc,2,2).substr($crc,0,2));
+}
 
 #########################################################################
 
