@@ -25,6 +25,9 @@ sub RTL433_USBSTICK_Initialize($)
 	$hash->{UndefFn} = "RTL433_USBSTICK_Undef";
 	$hash->{AttrList} =
 	  "do_not_notify:1,0 " . $readingFnAttributes;
+	
+	$hash->{Clients} = "RTL433_DEVICE";
+	$hash->{MatchList} = { "1:RTL433_DEVICE" => "^.*" };
 }
 
 #########################################################################									#
@@ -52,6 +55,8 @@ sub RTL433_USBSTICK_Define($$)
 		$RTL433_USBSTICK_select->add(\*KID_TO_READ);
 		$selectlist{$hash->{NAME}} = $hash;
 		$hash->{FD} = fileno(\*KID_TO_READ);# fileno();
+		$hash->{RTL433_USBSTICK_pid} = $RTL433_USBSTICK_pid;
+		$hash->{RTL433_USBSTICK_select} = $RTL433_USBSTICK_select;
 	} else {
 		# forked program
 		exec("rtl_433 -R 20 -C si -q -F csv");
@@ -97,22 +102,16 @@ sub RTL433_USBSTICK_Read($)
 		} 
 		
 	}
-	readingsBeginUpdate($hash);
 	my $substrlen = 0;
 	while($Readpart =~ m/(.*)\n/g) {
 		my $line = $1;
 		$substrlen += length($line)+1;
 		chomp $line;
-		Log3 $name, 4, "line: $line" ;
-		my ($time,$device,$channel,$temperature_F,$temperature_C,$humidity,$battery ) = (split (",", $line));
-		readingsBulkUpdate( $hash, "$channel-$device-temp", $temperature_C );
-		readingsBulkUpdate( $hash, "$channel-$device-humi", $humidity );
-		readingsBulkUpdate( $hash, "$channel-$device-batt", $battery );
+		Log3 $name, 5, "line: $line" ;
+		Dispatch($hash, $line, {});
 	}	
 	$Readpart = substr($Readpart, $substrlen);
-	###### in die READINGS schreiben
-	$hash->{RTL433_USBSTICK_pid} = $RTL433_USBSTICK_pid;
-	$hash->{RTL433_USBSTICK_select} = $RTL433_USBSTICK_select;
+	readingsBeginUpdate($hash);
 	readingsBulkUpdate( $hash, "ReadpartLength", length ($Readpart)  );
 	readingsEndUpdate( $hash, 1 );
 
