@@ -70,12 +70,13 @@ sub RTL433_DEVICE_Parse($$)
 		return "UNDEFINED RTL433_$addr RTL433_DEVICE $addr";
 	}
 	my $shash = $modules{RTL433_DEVICE}{defptr}{$addr};
+	my $t = sprintf('%.1f', $temperature_C);
 	readingsBeginUpdate($shash);
-	readingsBulkUpdate( $shash, "temperature", $temperature_C );
+	readingsBulkUpdate( $shash, "temperature", $t );
 	readingsBulkUpdate( $shash, "humidity", $humidity );
 	readingsBulkUpdate( $shash, "battery", $battery );
 	readingsEndUpdate( $shash, 1 );
-	$shash->{STATE} = "T:$temperature_C H:$humidity B:$battery";
+	$shash->{STATE} = "T:$t H:$humidity B:$battery";
 	return $shash->{NAME};
 }
 
