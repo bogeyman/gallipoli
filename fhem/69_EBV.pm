@@ -68,7 +68,10 @@ package main;
 
 use strict;                          #
 use warnings;                        #
-use Digest::CRC;
+
+my $missingModulDigest = "";
+
+eval "use Digest::CRC;1" or $missingModulDigest = "Digest::CRC ";
 
 sub EBV_Read($);                  #
 sub EBV_Ready($);                 #
@@ -90,7 +93,7 @@ sub EBV_Initialize($)
 	$hash->{DefFn}   = "EBV_Define";
 	$hash->{UndefFn} = "EBV_Undef";
 	$hash->{AttrList} =
-	  "do_not_notify:1,0 loglevel:0,1,2,3,4,5,6 " . $readingFnAttributes;
+	  "do_not_notify:1,0 " . $readingFnAttributes;
 }
 
 #########################################################################									#
@@ -115,6 +118,12 @@ sub EBV_Define($$)
 
 	$hash->{DeviceName} = $dev;
 	my $ret = DevIo_OpenDev( $hash, 0, "" );
+
+	if ($missingModulDigest) {
+		my $msg = "Modul functionality limited because of missing perl modules: " . $missingModulDigest;
+		Log3 undef, 1, $msg;
+		$hash->{PERL} = $msg;
+	}
 	return $ret;
 }
 
@@ -132,13 +141,28 @@ sub
 #########################################################################
 
 sub
-crc16Kermit($) {
+EBV_crc16Kermit($) {
   my ($raw)= pack("H*" ,@_);
   my $ctx= Digest::CRC->new(width=>16, init=>0x0000, xorout=>0x0000,
                           refout=>1, poly=>0x1021, refin=>1, cont=>1);
   $ctx->add($raw);
   my $crc = $ctx->hexdigest;
-  return uc(substr($crc,2,2).substr($crc,0,2));
+  return lc(substr($crc,2,2).substr($crc,0,2));
+}
+
+sub EBV_checkCrc16Kermit($$) {
+	my ($hash,$omsg) = @_;
+	my $name = $hash->{NAME};
+	if ($missingModulDigest) {
+		Log3 $name, 5, "EBV_checkCrc16Kermit: $missingModulDigest not installed, no check for $omsg";
+		return 1;
+	}
+	my $msgcrc = substr($omsg,-4);
+	my $msg = substr($omsg,0,-4);
+	my $crc = EBV_crc16Kermit($msg);
+	my $equal = ($msgcrc eq $crc);
+	Log3 $name, 5, "EBV_checkCrc16Kermit: equal=$equal crc=$crc msg=$msg $msgcrc";
+	return $equal;
 }
 
 #########################################################################
@@ -176,7 +200,13 @@ sub EBV_Read($)
 				# Es ist eine Raumstation angeschlossen
 			}
  			###### Relevante Daten extrahieren 
-			my $buf1 = substr( $Complete, $test1 + "6" , "66" ) ;
+			my $buf1 = substr( $Complete, $test1 + 2 , 76 );
+			if(!EBV_checkCrc16Kermit($hash, $buf1)) {
+				Log3 $name, 3, "EBV_Read: CRC error!";
+				$Readpart = "";
+				return "";
+			}
+			$buf1 = substr( $buf1, 4 );
 			my $Aussentemp = substr( $buf1, 2*2, 2 ); 
 			$Aussentemp = (hex($Aussentemp)/2) - 52;
 			my $Kesseltemp = substr( $buf1, 32*2, 2 ); 
