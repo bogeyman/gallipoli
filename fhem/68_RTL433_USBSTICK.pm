@@ -24,7 +24,7 @@ sub RTL433_USBSTICK_Initialize($)
 	$hash->{DefFn}   = "RTL433_USBSTICK_Define";
 	$hash->{UndefFn} = "RTL433_USBSTICK_Undef";
 	$hash->{AttrList} =
-	  "do_not_notify:1,0 loglevel:0,1,2,3,4,5,6 " . $readingFnAttributes;
+	  "do_not_notify:1,0 " . $readingFnAttributes;
 }
 
 #########################################################################									#
@@ -103,7 +103,7 @@ sub RTL433_USBSTICK_Read($)
 		my $line = $1;
 		$substrlen += length($line)+1;
 		chomp $line;
-		Log3 $hash, 4, "line: $line\n" ;
+		Log3 $name, 4, "line: $line" ;
 		my ($time,$device,$channel,$temperature_F,$temperature_C,$humidity,$battery ) = (split (",", $line));
 		readingsBulkUpdate( $hash, "$channel-$device-temp", $temperature_C );
 		readingsBulkUpdate( $hash, "$channel-$device-humi", $humidity );
