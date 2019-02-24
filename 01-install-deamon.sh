@@ -6,10 +6,7 @@ fi
 
 # dependencies
 # 
-dpkg --status python-rrdtool 2> /dev/null > /dev/null; 
-if [ $? -ne 0 ]; then 
-	apt-get install -y python-rrdtool
-fi
+apt-get install -y python-bitstring python-serial python-crcmod
 # backup old version
 if [ -e /usr/local/bin/gamma.py ]; then
 	service gamma stop
@@ -33,11 +30,3 @@ update-rc.d gallipoli defaults
 
 # Service
 service gallipoli restart
-
-# Munin scripts
-# test with "munin-run gallipoli-temperature"
-rm /usr/local/share/munin/plugins/gallipoli*
-cp munin/gallipoli* /usr/local/share/munin/plugins/
-rm /etc/munin/plugins/gallipoli*
-( cd /etc/munin/plugins/ && ln -s /usr/local/share/munin/plugins/gallipoli* .)
-service munin-node restart

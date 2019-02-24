@@ -192,6 +192,7 @@ class Parser(object):
 		return crc == crcMsg
 	def next(self):
 		msg = False
+                ffmode = False
 		while not msg:
 			if not self.synced:
 				if not self.sync():
@@ -218,6 +219,12 @@ class Parser(object):
 				if not self.bytes[2:]:
 					#self.logger.debug('read less than 3 bytes, exiting')
 					break
+                        if self.bytes[0:1] == '\xff' and self.bytes[2:3] == '\xff':
+                            #self.logger.logError("ffmode")
+                            ffmode = True
+                            self.bytes = self.bytes.replace('\xff', '')
+                            self.bytes += (self.port.read(5 - len(self.bytes))).replace('\xff', '')
+
 
 			# read rest of the datagram
 			# example: '20' is decimal for 32, the length zero based, adding three 
@@ -235,6 +242,13 @@ class Parser(object):
 			self.bytes += (self.port.read( toread ))
 			if(len(self.bytes) < (self.length + 4 + 3) ):
 				break;
+                        if ffmode:
+                            self.bytes = self.bytes.replace('\xff', '')
+                            toread = self.length + 4 + 3 - max(3, len(self.bytes))
+                            while toread > 0:
+                                self.bytes += (self.port.read( toread ))
+                                self.bytes = self.bytes.replace('\xff', '')
+                                toread = self.length + 4 + 3 - max(3, len(self.bytes))
 
 			msg = Message(separator, self.bytes)
 
