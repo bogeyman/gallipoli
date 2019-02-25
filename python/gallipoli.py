@@ -150,6 +150,10 @@ class Parser(object):
 					'\x1b\x1b\x1b\x1b\x1b',
 					'\x9c\x9c\x9c\x9c\x9c'
 					}) 
+
+                # Ceta Hack 
+		self.headerCetaFill = {'\x21\x0A\x0A\x84\x17'}
+                self.knownCommandsCeta = {'\x01', '\x11', '\x22'}
                 self.knownCommands = {'\x20\x04', '\x09\x05'}
 		self.knownCommands = self.knownCommands.union({'\x01\x00'})
 		self.knownCommands = self.knownCommands.union({'\x01\x01', '\x01\x02', '\x01\x04', '\x01\x05', '\x01\x06'})
@@ -164,13 +168,16 @@ class Parser(object):
 		self.crc_func = crcmod.predefined.mkCrcFun('kermit')
 		self.bytes=''
 		self.synced = False
+		self.ceta = False
 
 	def sync(self):
 		self.bytes = self.port.read(5)
 		if(len(self.bytes) < 5):
 			return False
 		syncLog = self.bytes
-		while (self.bytes not in self.headerFill) and ('\x82' not in self.bytes[:-1]):
+                if not self.ceta:
+                    self.ceta = self.bytes in self.headerCetaFill
+		while (self.bytes not in self.headerFill) and ('\x82' not in self.bytes[:-1]) and (not self.ceta): 
 			h = (self.port.read(1))
 			if(len(h) < 1):
 				#self.logger.debug('++++++ sync End FALSE %s' % self.bytes)
@@ -183,12 +190,16 @@ class Parser(object):
 		return True
 
 	def checkCrc(self):
-		msg = self.bytes[:-3]
-		crcMsg = binascii.hexlify( "%s%s" % (self.bytes[-2:-1], self.bytes[-3:-2]))
+                if self.ceta:
+                    msg = self.bytes[:-2]
+		    crcMsg = binascii.hexlify( "%s%s" % (self.bytes[-1], self.bytes[-2]))
+                else:
+                    msg = self.bytes[:-3]
+		    crcMsg = binascii.hexlify( "%s%s" % (self.bytes[-2], self.bytes[-3]))
 		crc = hex(self.crc_func((msg)))[2:]
 		while len(crc) < 4:
 			crc = ('%s%s' % ('0', crc ))
-		#self.logger.trace('crc %s %s %s %s' % (msg, crcMsg, crc, crc == crcMsg))
+		#self.logger.trace('crc %s %s %s %s' % (binascii.hexlify(msg), crcMsg, crc, crc == crcMsg))
 		return crc == crcMsg
 	def next(self):
 		msg = False
@@ -229,7 +240,11 @@ class Parser(object):
 			# read rest of the datagram
 			# example: '20' is decimal for 32, the length zero based, adding three 
 			#          bytes for checksum and stop byte. Adding total 4 bytes
-			self.length = int(binascii.hexlify(self.bytes[2:3]), 16)
+                        lengthpos = 2
+                        if self.ceta:
+                            lengthpos = 6
+			    self.bytes += (self.port.read(7 - len(self.bytes)))
+        		self.length = int(binascii.hexlify(self.bytes[lengthpos:lengthpos+1]), 16)
 
 			#self.logger.trace('got %s and will read %s more bytes' % (self.bytes, self.length))
 
@@ -239,6 +254,8 @@ class Parser(object):
 				self.synced = False
 				continue
 			toread = self.length + 4 + 3 - max(3, len(self.bytes))
+                        if self.ceta:
+                            toread += 2
 			self.bytes += (self.port.read( toread ))
 			if(len(self.bytes) < (self.length + 4 + 3) ):
 				break;
@@ -250,7 +267,7 @@ class Parser(object):
                                 self.bytes = self.bytes.replace('\xff', '')
                                 toread = self.length + 4 + 3 - max(3, len(self.bytes))
 
-			msg = Message(separator, self.bytes)
+			msg = Message(separator, self.bytes, ceta=self.ceta)
 
 			# check crc
 			if not self.checkCrc():
@@ -259,15 +276,22 @@ class Parser(object):
 				msg = False
 				continue
 
+                        # check command ceta
+                        if self.ceta and msg.lengthb not in self.knownCommandsCeta:
+				self.logger.logError("%s\nERROR COMMAND %s" % (binascii.hexlify(msg.separator), binascii.hexlify(msg.bytes)))
+				self.synced = False
+				msg = False
+				continue
+
 			# check command
-			if msg.lengthb+msg.command not in self.knownCommands:
+			if not self.ceta and msg.lengthb+msg.command not in self.knownCommands:
 				self.logger.logError("%s\nERROR COMMAND %s" % (binascii.hexlify(msg.separator), binascii.hexlify(msg.bytes)))
 				self.synced = False
 				msg = False
 				continue
 
 			# check footer
-			if msg.footer not in self.knownFooter:
+			if not self.ceta and msg.footer not in self.knownFooter:
 				self.logger.logError("%s\nERROR FOOTER %s" % (binascii.hexlify(msg.separator), binascii.hexlify(msg.bytes)))
 				self.synced = False
 				msg = False
@@ -358,16 +382,21 @@ class State(object):
 		return
 
 class Message(object):
-	def __init__(self, separator, bytes, isSync=False):
+	def __init__(self, separator, bytes, isSync=False, ceta=False):
 		self.separator = separator
 		self.bytes = bytes
 		self.sender = self.bytes[0:1]
 		self.receiver = self.bytes[1:2]
-		self.length = int(binascii.hexlify(self.bytes[2:3]), 16)
-		self.lengthb = self.bytes[2:3]
+                if ceta:
+                    self.length = int(binascii.hexlify(self.bytes[6]), 16)
+                    self.lengthb = self.bytes[6]
+                else:
+		    self.length = int(binascii.hexlify(self.bytes[2:3]), 16)
+                    self.lengthb = self.bytes[2:3]
 		self.command = self.bytes[3:4]
 		self.footer = self.bytes[-1:]
 		self.isSync = isSync
+		self.ceta = ceta
 
 	##########################################################################
 	def getDatetime(self):
